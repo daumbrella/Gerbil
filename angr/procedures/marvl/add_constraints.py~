@@ -1,0 +1,4 @@
+class add_constraints(angr.SimProcedure):
+    def run(self, ret_addr=None):
+        print "the netconn_recv ret addr ", ret_addr[0]
+        self.state.regs.ip=ret_addr[0]

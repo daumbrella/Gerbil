@@ -1,0 +1,13 @@
+import angr
+
+class netbuf_data(angr.SimProcedure):
+    def run(self):
+        global recv_data_sm
+        recv_data_sm=state.solver.BVS('netconn_buf',100*8)
+        r2=state.solver.BVS('r1',8)
+        r0=state.solver.BVS('r0',8)
+        state.memory.store(0x33333333,recv_data_sm)
+        state.memory.store(state.regs.r1,0x33333333)
+        state.memory.store(state.regs.r2,r2)
+        state.regs.r0=r0
+        state.regs.ip=state.regs.lr

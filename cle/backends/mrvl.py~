@@ -1,0 +1,105 @@
+from . import Backend, register_backend
+from ..errors import CLEError
+
+import logging
+import binascii
+l = logging.getLogger("cle.mvrl")
+
+__all__ = ('MRVL',)
+
+class MRVL(Backend):
+    """
+    This is a marvell binary firmware (miio) analysis module.
+    """
+#
+segments=[]
+
+    def __init__(self, path, custom_offset=None, segments=None, **kwargs):
+        """
+        :param custom_arch:   (required) an :class:`archinfo.Arch` for the binary blob.
+        :param custom_offset: Skip this many bytes from the beginning of the file.
+        :param segments:      List of tuples describing how to map data into memory. Tuples
+                              are of ``(file_offset, mem_addr, size)``.
+
+        mrvl almost used by miio, so this mrvl mainly handle the miio's firmware.
+        other types will be added in the future!
+        """
+        super(MRVL, self).__init__(path, **kwargs)
+ 
+        if self.arch is None:
+            self.arch='arm'
+        print(self.binary_stream)
+        if self._custom_entry_point is None:
+            l.warning("No custom_entry_point was specified for mrvl firmware %s, assuming 0", path)
+            self._custom_entry_point = 0
+
+        self._entry = self._custom_entry_point
+        self._max_addr = 0
+        self._min_addr = 2**64
+
+        try:
+            self.linked_base = kwargs['custom_base_addr']
+        except KeyError:
+            l.warning("No custom_base_addr was specified for mrvl firmware %s, assuming 0", path)
+        self.mapped_base = self.linked_base
+
+        self.os = 'miio'
+
+        for file_offset, mem_addr, size in segments:
+            self._load(file_offset, mem_addr, size)
+
+    @staticmethod
+    def is_compatible(stream):
+        identstring = stream.read(0x1000)
+        identhex=binascii.b2a_hex(identstring)
+        print(identhex)
+        stream.seek(0)
+        if identstring.startswith('MRVL') and len(identstring) > 0x40:
+            segments=mrvl_header(stream)
+            return True
+        return False
+        # return stream==0
+
+    @property
+    def min_addr(self):
+        return self._min_addr
+
+    @property
+    def max_addr(self):
+        return self._max_addr
+
+    def _load(self, file_offset, mem_addr, size):
+        """
+        Load a segment into memory.
+        """
+
+        self.binary_stream.seek(file_offset)
+        string = self.binary_stream.read(size)
+        self.memory.add_backer(mem_addr - self.linked_base, string)
+        self._max_addr = max(len(string) + mem_addr, self._max_addr)
+        self._min_addr = min(mem_addr, self._min_addr)
+
+    def function_name(self, addr): #pylint: disable=unused-argument,no-self-use
+        """
+        Blobs don't support function names.
+        """
+        return None
+
+    def contains_addr(self, addr):
+        return addr in self.memory
+
+    def in_which_segment(self, addr): #pylint: disable=unused-argument,no-self-use
+        """
+        Blobs don't support segments.
+        """
+        return None
+
+    @classmethod
+    def check_compatibility(cls, spec, obj): # pylint: disable=unused-argument
+        return True     
+    def mrvl_header(stream):
+        """
+        parse the mrvl header get all segments
+        """
+        return
+register_backend("mrvl", MRVL)
